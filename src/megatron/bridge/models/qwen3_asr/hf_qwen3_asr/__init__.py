@@ -35,6 +35,11 @@ from .modeling_qwen3_asr import Qwen3ASRAudioEncoder, Qwen3ASRForConditionalGene
 from .processing_qwen3_asr import Qwen3ASRProcessor
 
 
-AutoConfig.register("qwen3_asr", Qwen3ASRConfig)
-AutoModel.register(Qwen3ASRConfig, Qwen3ASRForConditionalGeneration)
-AutoProcessor.register(Qwen3ASRConfig, Qwen3ASRProcessor)
+# [dsv4_mxfp4_new fix] transformers>=5.4 already ships qwen3_asr upstream;
+# re-registering raises ValueError at import time, so only register when absent.
+from transformers.models.auto.configuration_auto import CONFIG_MAPPING as _CONFIG_MAPPING
+
+if "qwen3_asr" not in _CONFIG_MAPPING.keys():
+    AutoConfig.register("qwen3_asr", Qwen3ASRConfig)
+    AutoModel.register(Qwen3ASRConfig, Qwen3ASRForConditionalGeneration)
+    AutoProcessor.register(Qwen3ASRConfig, Qwen3ASRProcessor)

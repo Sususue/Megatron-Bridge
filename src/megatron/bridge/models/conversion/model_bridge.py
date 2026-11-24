@@ -287,8 +287,14 @@ def _megatron_local_name_to_global(
     is_expert_param = (is_grouped_expert_param or is_local_expert_param) and ".adapter." not in param_name
     ep_group = _get_ep_group(models) if is_expert_param else None
     if is_expert_param and ep_group is not None and get_pg_size(ep_group) > 1:
-        num_experts = config.num_moe_experts
-        num_experts_per_rank = num_experts // ep_group.size()
+        # [TOP16 PATCH] per-layer expert counts (hash layers keep 256)
+        _npl = getattr(config, "num_experts_per_layer", None)
+        if _npl:
+            _lm = re.search(r"layers\.(\d+)\.", param_name)
+            _num_experts = int(_npl[int(_lm.group(1))]) if _lm else int(_npl[0])
+        else:
+            _num_experts = config.num_moe_experts
+        num_experts_per_rank = _num_experts // ep_group.size()
 
         def _update_grouped_expert_number(param_name: str, param_type: str) -> str:
             """Update expert number from local to global for weight or bias parameters."""
@@ -916,8 +922,14 @@ class MegatronModelBridge(
         from megatron.bridge.utils.common_utils import extract_expert_number_from_param
 
         ep_size = parallel_state.get_expert_model_parallel_world_size()
-        num_experts = model_config.num_moe_experts
-        experts_per_rank = num_experts // ep_size
+        # [TOP16 PATCH] per-layer expert counts
+        _npl = getattr(model_config, "num_experts_per_layer", None)
+        if _npl:
+            _lm = re.search(r"layers\.(\d+)\.", task.param_name)
+            _num_experts = int(_npl[int(_lm.group(1))]) if _lm else int(_npl[0])
+        else:
+            _num_experts = model_config.num_moe_experts
+        experts_per_rank = _num_experts // ep_size
 
         try:
             local_expert_number = extract_expert_number_from_param(task.param_name) % experts_per_rank
